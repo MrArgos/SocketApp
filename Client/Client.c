@@ -5,7 +5,6 @@
 #include<stdio.h>
 #include<winsock2.h>
 #include<string.h>
-#define TRUE 1
 
 #pragma comment(lib,"ws2_32.lib") 
 #pragma warning(disable : 4996)
@@ -15,10 +14,8 @@ int main(int argc, char* argv[])
 	WSADATA wsa;
 	SOCKET s;
 	struct sockaddr_in server;
-	//char message[] = "GET / HTTP/1.1\r\n\r\n";
 	char* message = malloc(4096);
 	char server_reply[4096];
-	char* ptrToken;
 	int connected = FALSE;
 	int recv_size;
 	int ws_result;
@@ -32,8 +29,6 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
-	//printf("Initialised.\n");
-
 	//Create a socket
 	s = socket(AF_INET, SOCK_STREAM, 0);
 	if (s == INVALID_SOCKET)
@@ -46,8 +41,7 @@ int main(int argc, char* argv[])
 	while (!connected) {
 
 		// Pedir ip ao utilizador
-		printf("Insira ip de servidor> ");
-		//scanf("%s",ip);
+		printf("Insira IP do servidor> ");
 		fgets(ip, 20, stdin);
 
 		// create the socket  address (ip address and port)
@@ -74,11 +68,9 @@ int main(int argc, char* argv[])
 		if (strcmp(server_reply, "100 OK") == 0) {
 			puts("Connected\n");
 			connected = TRUE;
+			puts("Commands:\n<GETKEY X> - Generates <X> Euromilhoes Keys.\n<QUIT> - Closes connection and App.\n");
 		}
 	}
-	//Add a NULL terminating character to make it a proper string before printing
-	//server_reply[recv_size] = '\0';
-	//puts(server_reply);
 
 	while (TRUE)
 	{
@@ -94,40 +86,33 @@ int main(int argc, char* argv[])
 			return 1;
 		}
 
-		//Receive a reply from the server
 		recv_size = recv(s, server_reply, 4096, 0);
 		if (recv_size == SOCKET_ERROR)
 		{
 			puts("recv failed");
 		}
-
-		ptrToken = strtok(server_reply, " ");
-		if (strcmp(ptrToken, "200") == 0) {
+		if (strcmp(server_reply, "200 SENT") == 0) {
 			ZeroMemory(server_reply, 4096);
 			recv_size = recv(s, server_reply, 4096, 0);
-			printf("Server> \n%s\n", server_reply);	
+			printf("Server> \n%s\n", server_reply);
 		}
-		else if (strcmp(ptrToken, "300") == 0)
+		else if (strcmp(server_reply, "300 UNRECOGNISED") == 0)
 		{
-			ptrToken = strtok(NULL, "");
-			if (ptrToken != NULL) {
-				//ZeroMemory(server_reply, 4096);
-				//recv_size = recv(s, server_reply, 4096, 0);
-				printf("Server> Error:%s\n", ptrToken);
-			}
+			printf("Server> Error: Unrecognised command\n");
 		}
-		else if (strcmp(ptrToken, "400") == 0)
+		else if (strcmp(server_reply, "301 MISSING") == 0)
 		{
-			ptrToken = strtok(NULL, "");
-			printf("Server> %s!\n", ptrToken);
+			printf("Server> Error: <GETKEY X> - <X> missing (number of keys to generate).\n");
 		}
-
-
-		////Add a NULL terminating character to make it a proper string before printing
-		//server_reply[recv_size] = '\0';
-		//puts(server_reply);
-
-		
+		else if (strcmp(server_reply, "302 UNEXPECTED") == 0)
+		{
+			printf("Server> Error: <GETKEY X> - Expected a number after <GETKEY> command.\n");
+		}
+		else if (strcmp(server_reply, "400 BYE") == 0)
+		{
+			printf("Server> Closing connection... Bye!\n");
+			break;
+		}
 	}
 
 	// Close the socket

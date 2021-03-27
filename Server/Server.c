@@ -76,7 +76,6 @@ int main()
 	int i = 1;
 	int numKeys = 0;
 
-	//strcpy(strMsg, "100 OK\r\n");
 	strcpy(strMsg, "100 OK");
 	send(clientSocket, strMsg, strlen(strMsg) + 1, 0);
 	while (TRUE) {
@@ -97,19 +96,22 @@ int main()
 
 			printf("%i : %s\n", i++, strRec);
 
+			if (strcmp(strRec, "QUIT") == 0) {
+				strcpy(strMsg, "400 BYE");
+				send(clientSocket, strMsg, strlen(strMsg) + 1, 0);
+				printf("Response: %s\n", strMsg);
+				break;
+			}
+
 			ptrToken = strtok(strRec, " ");
 			if (strcmp(ptrToken, "GETKEY") == 0)
 			{
-				//strcpy(strMsg, "GETKEY recieved\r\n");
-				//send(clientSocket, strMsg, strlen(strMsg) + 1, 0);
-				
 				ptrToken = strtok(NULL, " ");
 				if (ptrToken != NULL) {
 					numKeys = atoi(ptrToken);
 					if (numKeys) {
-						strcpy(strMsg, "200 OK");
+						strcpy(strMsg, "200 SENT");
 						send(clientSocket, strMsg, strlen(strMsg) + 1, 0);
-
 						ZeroMemory(strMsg, 4096);
 						for (int i = 0; i < numKeys; i++)
 						{
@@ -118,35 +120,23 @@ int main()
 							strcat_s(strMsg, 4069, keyString);
 							strcat_s(strMsg, 4096, "\r\n");
 						}
-						Sleep(1000);
-						send(clientSocket, strMsg, strlen(strMsg) + 1, 0);
 					}
 					else
 					{
-						//Sleep(1000);
-						strcpy(strMsg, "300 <GETKEY X> - was expecting number");
-						send(clientSocket, strMsg, strlen(strMsg) + 1, 0);
+						strcpy(strMsg, "302 UNEXPECTED");
 					}
 				}
 				else
 				{
-					//Sleep(1000);
-					strcpy(strMsg, "300 <GETKEY X> - use <X>");
-					send(clientSocket, strMsg, strlen(strMsg) + 1, 0);
+					strcpy(strMsg, "301 MISSING");
 				}
 			}
-
-			puts("Response: %s\n", strMsg);
-
-			if (strcmp(strRec, "QUIT") == 0) {
-				//Sleep(1000);
-				strcpy(strMsg, "400 BYE");
-				send(clientSocket, strMsg, strlen(strMsg) + 1, 0);
-				puts("Response: %s\n", strMsg);
-				//Sleep(1000);
-				break;
+			else
+			{
+				strcpy(strMsg, "300 UNRECOGNISED");
 			}
-
+			send(clientSocket, strMsg, strlen(strMsg) + 1, 0);
+			printf("Response: %s\n", strMsg);
 		}
 	}
 
@@ -225,13 +215,20 @@ const char* StringFromKey(int* key) {
 	}
 	strcpy_s(str, 2000, "");
 
-	// Escrever array com as chaves numa string
+	// Escrever array com a chave numa string
 	for (int i = 0; i < KEY_SIZE_FULL; i++)
 	{
-		sprintf_s(&str[strlen(str)], sizeof(int), "%d\t", key[i]);
+		if (key[i] < 10)
+		{
+			sprintf_s(&str[strlen(str)], (sizeof(int) + (3 * sizeof(char))), "%d   ", key[i]);
+		}
+		else
+		{
+			sprintf_s(&str[strlen(str)], (sizeof(int) + (3 * sizeof(char))), "%d  ", key[i]);
+		}
 		if (i == 4)
 		{
-			strcat_s(str, sizeof(char) * (strlen(str) + 3), "+\t");
+			strcat_s(str, sizeof(char) * (strlen(str) + 7), " +   ");
 		}
 	}
 	return str;
