@@ -33,7 +33,7 @@ int main()
 	WSADATA wsData;
 	WORD ver = MAKEWORD(2, 2);
 
-	printf("\nInitialising Winsock...");
+	//printf("\nInitialising Winsock...");
 	int wsResult = WSAStartup(ver, &wsData);
 	if (wsResult != 0) {
 		fprintf(stderr, "\nWinsock setup fail! Error Code : %d\n", WSAGetLastError());
@@ -47,7 +47,7 @@ int main()
 		return 1;
 	}
 
-	printf("\nSocket created.\n");
+	printf("\nInitialized. Waiting for connection...\n");
 
 	// Bind the socket (ip address and port)
 	struct sockaddr_in hint;
@@ -73,7 +73,7 @@ int main()
 	char strMsg[4096];
 	char strRec[4096];
 
-	int i = 1;
+	int msgCount = 0;
 	int numKeys = 0;
 
 	strcpy(strMsg, "100 OK");
@@ -94,7 +94,7 @@ int main()
 		if (strcmp(strRec, "\r\n") != 0)
 		{
 
-			printf("%i : %s\n", i++, strRec);
+			printf("%i : %s\n", ++msgCount, strRec);
 
 			if (strcmp(strRec, "QUIT") == 0) {
 				strcpy(strMsg, "400 BYE");
