@@ -15,7 +15,7 @@
 void GenerateKey(int* key);
 int cmp_fnc(const void* a, const void* b);
 const char* StringFromKey(int* key);
-void SaveToFile(char message[]);
+void SaveStringToFile(char message[]);
 
 int main()
 {
@@ -69,6 +69,8 @@ int main()
 	// Close listening socket
 	closesocket(listening);
 
+	printf("Connected\n\n");
+
 	// Main program loop
 	char strMsg[4096];
 	char strRec[4096];
@@ -117,9 +119,13 @@ int main()
 						{
 							GenerateKey(key);
 							keyString = StringFromKey(key);
-							strcat_s(strMsg, 4069, keyString);
+							strcat_s(strMsg, 4096, keyString);
 							strcat_s(strMsg, 4096, "\r\n");
 						}
+						time_t now = time(0);
+						char* dt = ctime(&now);
+						strcat_s(strMsg, 4096, "Generated at: ");
+						strcat_s(strMsg, 4096, dt);
 					}
 					else
 					{
@@ -237,8 +243,8 @@ const char* StringFromKey(int* key) {
 /// <summary>
 /// Acrescenta a(s) chave(s) a um ficheiro.
 /// </summary>
-/// <param name="message">- array com a(s) chave(s) a guardar</param>
-void SaveToFile(char message[])
+/// <param name="message">- string com a(s) chave(s) a guardar</param>
+void SaveStringToFile(char message[])
 {
 	FILE* fp;
 	errno_t erro;
