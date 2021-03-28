@@ -162,6 +162,9 @@ int main()
 /// <param name="key">- array onde será guardada a chave</param>
 void GenerateKey(int* key) {
 
+	FILE* fp = fopen("keys.txt", "a");
+	int written;
+
 	// Gerar chave - números aleatórios 1-50 - e guardar no array.  
 	for (int i = 0; i < KEY_SIZE_NO_STARS; i++)
 	{
@@ -200,6 +203,19 @@ void GenerateKey(int* key) {
 		key[5] = stars[0];
 		key[6] = stars[1];
 	}
+
+	for (int i = 0; i < 7; i++)
+	{
+		if (i == 6)
+		{
+			fprintf(fp, "%d\n", key[i]);
+		}
+		else
+		{
+			fprintf(fp, "%d ", key[i]);
+		}
+	}
+	fclose(fp);
 }
 
 // Função de comparação a utilizar no qsort()
@@ -259,4 +275,5 @@ void SaveStringToFile(char message[])
 		fprintf(stderr, "Erro a escrever no ficheiro.\n");
 		return;
 	}
+	fclose(fp);
 }
