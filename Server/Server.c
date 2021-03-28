@@ -19,15 +19,27 @@ void SaveStringToFile(char message[]);
 
 int main()
 {
-	// Inicializar variáveis para geração de chaves
+	// variáveis para geração de chaves
 	int key[KEY_SIZE_FULL];
 	char message[2000] = "";
 	const char* keyString;
-	char* ptrToken;
+	char* partialMsg;
 	int numKeysInt;
+	int countAllKeys = 0;
+	int isAlike = 0;
 	char numKeysChar[100];
 	strcpy_s(message, 2000, "");
 	srand((unsigned)time(NULL));
+
+	int allKeys[100][KEY_SIZE_FULL];
+
+	/*int** allKeys = (int**)malloc(4096 * sizeof(int*));
+	if (allKeys != NULL) {
+		for (int i = 0; i < 4096; i++)
+		{
+			allKeys[i] = (int*)malloc(KEY_SIZE_FULL * sizeof(int));
+		}
+	}*/
 
 	// Initialise winsock
 	WSADATA wsData;
@@ -105,26 +117,58 @@ int main()
 				break;
 			}
 
-			ptrToken = strtok(strRec, " ");
-			if (strcmp(ptrToken, "GETKEY") == 0)
+			partialMsg = strtok(strRec, " ");
+			if (strcmp(partialMsg, "GETKEY") == 0)
 			{
-				ptrToken = strtok(NULL, " ");
-				if (ptrToken != NULL) {
-					numKeys = atoi(ptrToken);
+				partialMsg = strtok(NULL, " ");
+				if (partialMsg != NULL) {
+					numKeys = atoi(partialMsg);
 					if (numKeys) {
 						strcpy(strMsg, "200 SENT");
 						send(clientSocket, strMsg, strlen(strMsg) + 1, 0);
 						ZeroMemory(strMsg, 4096);
-						for (int i = 0; i < numKeys; i++)
+						for (int k = 0; k < numKeys; k++)
 						{
 							GenerateKey(key);
-							keyString = StringFromKey(key);
-							strcat_s(strMsg, 4096, keyString);
-							strcat_s(strMsg, 4096, "\r\n");
+							for (int i = 0; i < countAllKeys; i++)
+							{
+								isAlike = 0;
+								for (int j = 0; j < KEY_SIZE_FULL; j++)
+								{
+										if (allKeys[i][j] == key[j]) 
+										{
+											isAlike++;
+										}
+										else
+										{
+											break;
+										}
+								}
+								if (isAlike == KEY_SIZE_FULL)
+								{
+									printf("Found repeated key:\n");
+									k--;
+									break;
+								}
+							}
+
+							if (isAlike != KEY_SIZE_FULL) {
+								for (int w = 0; w < KEY_SIZE_FULL; w++)
+								{
+									allKeys[countAllKeys][w] = key[w];
+								}
+								keyString = StringFromKey(key);
+								strcat_s(strMsg, 4096, keyString);
+								strcat_s(strMsg, 4096, "\r\n");
+								countAllKeys++;
+							}
 						}
+						strcat_s(strMsg, 4096, "Generated ");
+						sprintf_s(&strMsg[strlen(strMsg)], sizeof(int), "%d", countAllKeys);
+						strcat_s(strMsg, 4096, " keys so far\n");
 						time_t now = time(0);
 						char* dt = ctime(&now);
-						strcat_s(strMsg, 4096, "Generated at: ");
+						strcat_s(strMsg, 4096, "Sent at: ");
 						strcat_s(strMsg, 4096, dt);
 					}
 					else
