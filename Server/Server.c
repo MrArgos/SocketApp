@@ -27,11 +27,11 @@ int main()
 	int numKeysInt;
 	int countAllKeys = 0;
 	int isAlike = 0;
-	char numKeysChar[100];
+	//char numKeysChar[100];
 	strcpy_s(message, 2000, "");
 	srand((unsigned)time(NULL));
 
-	int allKeys[100][KEY_SIZE_FULL];
+	int allKeys[100000][KEY_SIZE_FULL];
 
 	/*int** allKeys = (int**)malloc(4096 * sizeof(int*));
 	if (allKeys != NULL) {
