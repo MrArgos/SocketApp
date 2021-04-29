@@ -16,22 +16,11 @@ void GenerateKey(int* key);
 int cmp_fnc(const void* a, const void* b);
 const char* StringFromKey(int* key);
 void SaveStringToFile(char message[]);
+DWORD WINAPI handleconnection(LPVOID lpParam);
 
 int main()
 {
-	// variáveis para geração de chaves
-	int key[KEY_SIZE_FULL];
-	char message[2000] = "";
-	const char* keyString;
-	char* partialMsg;
-	int numKeysInt;
-	int countAllKeys = 0;
-	int isAlike = 0;
-	//char numKeysChar[100];
-	strcpy_s(message, 2000, "");
-	srand((unsigned)time(NULL));
-
-	int allKeys[100000][KEY_SIZE_FULL];
+	//int allKeys[100000][KEY_SIZE_FULL];
 
 	/*int** allKeys = (int**)malloc(4096 * sizeof(int*));
 	if (allKeys != NULL) {
@@ -74,28 +63,65 @@ int main()
 
 	// Wait for connection
 	struct sockaddr_in client;
-	int clientSize = sizeof(client);
+	int clientSize;
+	SOCKET clientSocket;
+	SOCKET* ptclientSocket;
+	DWORD dwThreadId;
+	HANDLE hThread;
+	int conresult = 0;
 
-	SOCKET clientSocket = accept(listening, (struct sockaddr*)&client, &clientSize);
+	while (TRUE)
+	{
+		clientSize = sizeof(client);
+		clientSocket = accept(listening, (struct sockaddr*)&client, &clientSize);
+		ptclientSocket = &clientSocket;
 
-	// Close listening socket
+		//printf("\nNova conexao %s\n", client.sin_addr);
+
+		hThread = CreateThread(NULL, 0, handleconnection, ptclientSocket, 0, &dwThreadId);
+
+		if (hThread == NULL)
+		{
+			printf("\nErro de criacao de Thread.\n");
+		}
+	}
+
+	closesocket(clientSocket);
 	closesocket(listening);
+	WSACleanup();
+}
 
-	printf("Connected\n\n");
-
+DWORD WINAPI handleconnection(LPVOID lpParam)
+{
 	// Main program loop
 	char strMsg[4096];
 	char strRec[4096];
 
+	SOCKET cs;
+	SOCKET* ptCs;
+	ptCs = (SOCKET*)lpParam;
+	cs = *ptCs;
+
+	// variáveis para geração de chaves
+	int key[KEY_SIZE_FULL];
+	char message[2000] = "";
+	const char* keyString;
+	char* partialMsg;
+	int numKeysInt;
+	int countAllKeys = 0;
+	int isAlike = 0;
+	//char numKeysChar[100];
+	strcpy_s(message, 2000, "");
+	srand((unsigned)time(NULL));
 	int msgCount = 0;
 	int numKeys = 0;
 
 	strcpy(strMsg, "100 OK");
-	send(clientSocket, strMsg, strlen(strMsg) + 1, 0);
+	send(cs, strMsg, strlen(strMsg) + 1, 0);
 	while (TRUE) {
 		ZeroMemory(strRec, 4096);
 		ZeroMemory(strMsg, 4096);
-		int bytesReceived = recv(clientSocket, strRec, 4096, 0);
+		int bytesReceived = recv(cs, strRec, 4096, 0);
 		if (bytesReceived == SOCKET_ERROR) {
 			printf("\nReceive error!\n");
 			break;
@@ -112,7 +138,7 @@ int main()
 
 			if (strcmp(strRec, "QUIT") == 0) {
 				strcpy(strMsg, "400 BYE");
-				send(clientSocket, strMsg, strlen(strMsg) + 1, 0);
+				send(cs, strMsg, strlen(strMsg) + 1, 0);
 				printf("Response: %s\n", strMsg);
 				break;
 			}
@@ -125,12 +151,12 @@ int main()
 					numKeys = atoi(partialMsg);
 					if (numKeys) {
 						strcpy(strMsg, "200 SENT");
-						send(clientSocket, strMsg, strlen(strMsg) + 1, 0);
+						send(cs, strMsg, strlen(strMsg) + 1, 0);
 						ZeroMemory(strMsg, 4096);
 						for (int k = 0; k < numKeys; k++)
 						{
 							GenerateKey(key);
-							for (int i = 0; i < countAllKeys; i++)
+							/*for (int i = 0; i < countAllKeys; i++)
 							{
 								isAlike = 0;
 								for (int j = 0; j < KEY_SIZE_FULL; j++)
@@ -156,12 +182,21 @@ int main()
 								for (int w = 0; w < KEY_SIZE_FULL; w++)
 								{
 									allKeys[countAllKeys][w] = key[w];
-								}
-								keyString = StringFromKey(key);
-								strcat_s(strMsg, 4096, keyString);
-								strcat_s(strMsg, 4096, "\r\n");
-								countAllKeys++;
+								}*/
+							keyString = StringFromKey(key); 
+
+							if (KeyInFile(keyString))
+							{
+								printf("Encontrada chave repetida.\n");
+								k--;
+								break;
 							}
+
+							SaveStringToFile(keyString);
+							strcat_s(strMsg, 4096, keyString);
+							strcat_s(strMsg, 4096, "\r\n");
+							countAllKeys++;
+							//}
 						}
 						strcat_s(strMsg, 4096, "Generated ");
 						sprintf_s(&strMsg[strlen(strMsg)], sizeof(int), "%d", countAllKeys);
@@ -185,18 +220,10 @@ int main()
 			{
 				strcpy(strMsg, "300 UNRECOGNISED");
 			}
-			send(clientSocket, strMsg, strlen(strMsg) + 1, 0);
+			send(cs, strMsg, strlen(strMsg) + 1, 0);
 			printf("Response: %s\n", strMsg);
 		}
 	}
-
-	// Close the socket
-	closesocket(clientSocket);
-
-	//Cleanup winsock
-	WSACleanup();
-
-	return 1;
 }
 
 /// <summary>
@@ -205,10 +232,6 @@ int main()
 /// </summary>
 /// <param name="key">- array onde será guardada a chave</param>
 void GenerateKey(int* key) {
-
-	FILE* fp = fopen("keys.txt", "a");
-	int written;
-
 	// Gerar chave - números aleatórios 1-50 - e guardar no array.  
 	for (int i = 0; i < KEY_SIZE_NO_STARS; i++)
 	{
@@ -247,19 +270,6 @@ void GenerateKey(int* key) {
 		key[5] = stars[0];
 		key[6] = stars[1];
 	}
-
-	for (int i = 0; i < 7; i++)
-	{
-		if (i == 6)
-		{
-			fprintf(fp, "%d\n", key[i]);
-		}
-		else
-		{
-			fprintf(fp, "%d ", key[i]);
-		}
-	}
-	fclose(fp);
 }
 
 // Função de comparação a utilizar no qsort()
@@ -320,4 +330,65 @@ void SaveStringToFile(char message[])
 		return;
 	}
 	fclose(fp);
+}
+
+char* readLine(FILE* infile)
+{
+	int n = 0, size = 128, ch;
+	char* line;
+	line = malloc(size + 1);
+	while ((ch = getc(infile)) != '\n' && ch != EOF) {
+		if (n == size) {
+			size = 2;
+			line = realloc(line, size + 1);
+		}
+		line[n++] = ch;
+	}
+	if (n == 0 && ch == EOF) {
+		free(line);
+		return NULL;
+	}
+	line[n] = '\0';
+	line = realloc(line, n + 1);
+	return line;
+}
+
+int KeyExistsInFile(char message[]) {
+	char key = NULL;
+	int exists = 0;
+
+	FILE* fp = fopen("keys.txt", "r");
+	while (key != EOF)
+	{
+		key = readLine(fp);
+		if (strcmp(key, message) == 0) {
+			exists = 1;
+		}
+	}
+	fclose(fp);
+
+	return exists;
+}
+
+int KeyInFile(char message[]) {
+	FILE* fp;
+	char* line = NULL;
+	size_t len = 0;
+	int exists = 0;
+
+	fp = fopen("key.txt", "r");
+	if (fp == NULL)
+	{
+		printf("\nErro a abrir ficheiro.\n");
+	}
+
+	while ((fgets(&line, sizeof(message), fp)) != -1)
+	{
+		if (strcmp(line ,message) == 0)
+		{
+			exists = 1;
+		}
+	}
+	fclose(fp);
+	return exists;
 }
