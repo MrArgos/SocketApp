@@ -21,54 +21,48 @@ int main(int argc, char* argv[])
 	int ws_result;
 	char* ip = malloc(20);
 
-	// Initialise winsock
-	printf("\nInitialising Winsock...");
+	// Inicializar Winsocks
 	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
 	{
 		printf("Failed. Error Code : %d", WSAGetLastError());
 		return 1;
 	}
 
-	//Create a socket
+	// Criar Socket
 	s = socket(AF_INET, SOCK_STREAM, 0);
 	if (s == INVALID_SOCKET)
 	{
 		printf("Could not create socket : %d", WSAGetLastError());
 	}
 
-	printf("Socket created.\n");
-
 	while (!connected) {
 
 		// Pedir ip ao utilizador
-		printf("Insira IP do servidor> ");
+		printf("\nPlease input Server IP Address> ");
 		fgets(ip, 20, stdin);
 
-		// create the socket  address (ip address and port)
-		//server.sin_addr.s_addr = inet_addr("25.72.114.113");
-		//server.sin_addr.s_addr = inet_addr("127.0.0.1");
+		// Endereço IP e Porta do servidor
 		server.sin_addr.s_addr = inet_addr(ip);
 		server.sin_family = AF_INET;
 		server.sin_port = htons(68000);
 
-		//Connect to remote server
+		// Ligar ao servidor
 		ws_result = connect(s, (struct sockaddr*)&server, sizeof(server));
 		if (ws_result < 0)
 		{
-			puts("connect error");
-			return 1;
+			puts("Error: Can't connect to Server.");
 		}
 
 		recv_size = recv(s, server_reply, 4096, 0);
 		if (recv_size == SOCKET_ERROR)
 		{
-			puts("recv failed");
+			puts("Error: No response from Server.");
 		}
 
 		if (strcmp(server_reply, "100 OK") == 0) {
 			puts("Connected\n");
 			connected = TRUE;
-			puts("Commands:\n<GETKEY X> - Generates <X> Euromilhoes Keys.\n<QUIT> - Closes connection and App.\n");
+			puts("Commands:\n<GETKEY X> - Generates <X> Euromilhoes Keys.\n<QUIT> - Close connection and application.\n");
 		}
 	}
 
@@ -79,7 +73,7 @@ int main(int argc, char* argv[])
 		fputs("> ", stdout);
 		fgets(message, 4096, stdin);
 
-		ws_result = send(s, message, strlen(message) - 1, 0);  // (-1) para nao enviar \n
+		ws_result = send(s, message, strlen(message) - 1, 0);
 		if (ws_result < 0)
 		{
 			puts("Send failed");
@@ -89,9 +83,9 @@ int main(int argc, char* argv[])
 		recv_size = recv(s, server_reply, 4096, 0);
 		if (recv_size == SOCKET_ERROR)
 		{
-			puts("recv failed");
+			puts("Receive failed");
 		}
-		if (strcmp(server_reply, "200 SENT") == 0) {
+		if (strcmp(server_reply, "200 SENDING") == 0) {
 			ZeroMemory(server_reply, 4096);
 			recv_size = recv(s, server_reply, 4096, 0);
 			printf("Server> \n%s\n", server_reply);
@@ -111,14 +105,12 @@ int main(int argc, char* argv[])
 		else if (strcmp(server_reply, "400 BYE") == 0)
 		{
 			printf("Server> Closing connection... Bye!\n");
+			system("pause");
 			break;
 		}
 	}
 
-	// Close the socket
 	closesocket(s);
-
-	//Cleanup winsock
 	WSACleanup();
 
 	return 0;

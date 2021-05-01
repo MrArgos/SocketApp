@@ -104,9 +104,7 @@ DWORD WINAPI KeyGenerator(LPVOID lpParam)
 	char message[2000] = "";
 	const char* keyString;
 	char* partialMsg;
-	int numKeysInt;
 	int countAllKeys = 0;
-	int isAlike = 0;
 	strcpy_s(message, 2000, "");
 	srand((unsigned)time(NULL));
 	int msgCount = 0;
@@ -135,7 +133,7 @@ DWORD WINAPI KeyGenerator(LPVOID lpParam)
 			if (strcmp(strRec, "QUIT") == 0) {
 				strcpy(strMsg, "400 BYE");
 				send(cs, strMsg, strlen(strMsg) + 1, 0);
-				printf("Response:\n%s\n", strMsg);
+				printf("Response:%s\n", strMsg);
 				break;
 			}
 
@@ -143,14 +141,15 @@ DWORD WINAPI KeyGenerator(LPVOID lpParam)
 			// Verifica se recebeu o comando GETKEY
 			if (strcmp(partialMsg, "GETKEY") == 0)
 			{
-				// guarda o primeiro parametro do comando GETKEY
+				// verifica o primeiro parametro do comando GETKEY
 				partialMsg = strtok(NULL, " ");
 				if (partialMsg != NULL) {
 					numKeys = atoi(partialMsg);
 					// Se o parametro for um numero, gera esse numero de chaves
 					if (numKeys) {
-						strcpy(strMsg, "200 SENT");
+						strcpy(strMsg, "200 SENDING");
 						send(cs, strMsg, strlen(strMsg) + 1, 0);
+						printf("Response:\n%s\n", strMsg);
 						ZeroMemory(strMsg, 4096);
 
 						// Esperar que o mutex seja libertado
@@ -170,7 +169,7 @@ DWORD WINAPI KeyGenerator(LPVOID lpParam)
 									// se existir, decrementa k, gerando mais uma chave
 									if (KeyExistsInfile(keyString))
 									{
-										printf("Encontrada chave repetida.\n");
+										printf("\nEncontrada chave repetida.\n");
 										k--;
 										break;
 									}
@@ -180,17 +179,17 @@ DWORD WINAPI KeyGenerator(LPVOID lpParam)
 								}
 								// conta numero de chaves geradas, e adiciona à mensagem a enviar
 								countAllKeys = CountKeysInFile();
-								strcat_s(strMsg, 4096, "Generated ");
+								strcat_s(strMsg, 4096, "This server has generated ");
 								sprintf_s(&strMsg[strlen(strMsg)], sizeof(int), "%d", countAllKeys);
-								strcat_s(strMsg, 4096, " keys so far\n");
+								strcat_s(strMsg, 4096, " keys so far.\n");
 								time_t now = time(0);
 								char* dt = ctime(&now);
-								strcat_s(strMsg, 4096, "Sent at: ");
+								strcat_s(strMsg, 4096, "The current date and time is: ");
 								strcat_s(strMsg, 4096, dt);
 
 							}
 
-							__finally {
+							__finally {		// Libertar o Mutex quando terminar a geração das chaves
 								if (!ReleaseMutex(fileMutex))
 								{
 									printf("\nErro a libertar Mutex\n");
@@ -218,7 +217,7 @@ DWORD WINAPI KeyGenerator(LPVOID lpParam)
 				strcpy(strMsg, "300 UNRECOGNISED");
 			}
 			send(cs, strMsg, strlen(strMsg) + 1, 0);
-			printf("Response: %s\n", strMsg);
+			printf("Response:\n%s\n", strMsg);
 		}
 	}
 }
@@ -277,7 +276,7 @@ int cmp_fnc(const void* a, const void* b) {
 /// <summary>
 /// Retorna uma string com a chave passada à função.
 /// </summary>
-/// <param name="key">Array que contém a chave ordenada</param>
+/// <param name="key">- Array que contém a chave ordenada</param>
 /// <returns>string com a chave</returns>
 const char* StringFromKey(int* key) {
 	char* str = malloc(2000);
@@ -314,17 +313,15 @@ const char* StringFromKey(int* key) {
 void SaveStringToFile(char message[])
 {
 	FILE* fp;
-	//errno_t erro;
-	//erro = fopen_s(&fp, "chaves.txt", "a");
 	fp = fopen("chaves.txt", "a");
 	if (fp == NULL)
 	{
-		fprintf(stderr, "Erro a abrir ficheiro.\n");
+		fprintf(stderr, "\nErro a abrir ficheiro.\n");
 		return;
 	}
 	if (fputs(message, fp) < 0)
 	{
-		fprintf(stderr, "Erro a escrever no ficheiro.\n");
+		fprintf(stderr, "\nErro a escrever no ficheiro.\n");
 		return;
 	}
 	fclose(fp);
@@ -343,7 +340,7 @@ int KeyExistsInfile(char message[]) {
 	fp = fopen("chaves.txt", "r");
 	if (fp == NULL)
 	{
-		printf("Erro a ler ficheiro");
+		printf("\nErro a ler ficheiro\n");
 		return 0;
 	}
 
@@ -369,7 +366,7 @@ int CountKeysInFile() {
 	fp = fopen("chaves.txt", "r");
 	if (fp == NULL)
 	{
-		printf("Erro a ler ficheiro");
+		printf("\nErro a ler ficheiro\n");
 		return 0;
 	}
 
