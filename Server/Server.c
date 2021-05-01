@@ -167,7 +167,7 @@ DWORD WINAPI KeyGenerator(LPVOID lpParam)
 									GenerateKey(key);
 									keyString = StringFromKey(key);
 
-									// verifica se a chave gerada já existe
+									// Verifica se a chave gerada já existe.
 									// se existir, decrementa k, gerando mais uma chave
 									if (KeyExistsInfile(keyString))
 									{
@@ -176,6 +176,7 @@ DWORD WINAPI KeyGenerator(LPVOID lpParam)
 										break;
 									}
 
+									// Guardar a chave no ficheiro "chaves.txt"
 									SaveStringToFile(keyString);
 									strcat_s(strMsg, 4096, keyString);
 								}
@@ -276,10 +277,10 @@ int cmp_fnc(const void* a, const void* b) {
 }
 
 /// <summary>
-/// Retorna uma string com a chave passada à função.
+/// Transforma array de int em string contendo a chave
 /// </summary>
 /// <param name="key">- Array que contém a chave ordenada</param>
-/// <returns>string com a chave</returns>
+/// <returns>char* str - string com a chave</returns>
 const char* StringFromKey(int* key) {
 	char* str = malloc(2000);
 	if (str == NULL)
