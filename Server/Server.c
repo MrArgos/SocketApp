@@ -16,41 +16,38 @@ void GenerateKey(int* key);
 int cmp_fnc(const void* a, const void* b);
 const char* StringFromKey(int* key);
 void SaveStringToFile(char message[]);
-DWORD WINAPI handleconnection(LPVOID lpParam);
+int KeyExistsInfile(char message[]);
+int CountKeysInFile();
+DWORD WINAPI KeyGenerator(LPVOID lpParam);
+HANDLE fileMutex;
 
 int main()
 {
-	//int allKeys[100000][KEY_SIZE_FULL];
-
-	/*int** allKeys = (int**)malloc(4096 * sizeof(int*));
-	if (allKeys != NULL) {
-		for (int i = 0; i < 4096; i++)
-		{
-			allKeys[i] = (int*)malloc(KEY_SIZE_FULL * sizeof(int));
-		}
-	}*/
-
-	// Initialise winsock
 	WSADATA wsData;
 	WORD ver = MAKEWORD(2, 2);
-
-	//printf("\nInitialising Winsock...");
 	int wsResult = WSAStartup(ver, &wsData);
 	if (wsResult != 0) {
 		fprintf(stderr, "\nWinsock setup fail! Error Code : %d\n", WSAGetLastError());
 		return 1;
 	}
 
-	// Create a socket
+	// Criar o Mutex para controlar o acesso ao ficheiro das chaves
+	fileMutex = CreateMutex(NULL, FALSE, NULL);
+	if (fileMutex == NULL)
+	{
+		printf("Erro na criacao do Mutex: %d\n", GetLastError());
+		return 1;
+	}
+	// Criar o socket
 	SOCKET listening = socket(AF_INET, SOCK_STREAM, 0);
 	if (listening == INVALID_SOCKET) {
 		fprintf(stderr, "\nSocket creationg fail! Error Code : %d\n", WSAGetLastError());
 		return 1;
 	}
 
-	printf("\nInitialized. Waiting for connection...\n");
+	printf("\nA espera de conexao...\n");
 
-	// Bind the socket (ip address and port)
+	// Bind ao socket (endereço IP e porta)
 	struct sockaddr_in hint;
 	hint.sin_family = AF_INET;
 	hint.sin_port = htons(DS_TEST_PORT);
@@ -58,10 +55,9 @@ int main()
 
 	bind(listening, (struct sockaddr*)&hint, sizeof(hint));
 
-	// Setup the socket for listening
+	// por o socket em modo listening
 	listen(listening, SOMAXCONN);
 
-	// Wait for connection
 	struct sockaddr_in client;
 	int clientSize;
 	SOCKET clientSocket;
@@ -76,9 +72,9 @@ int main()
 		clientSocket = accept(listening, (struct sockaddr*)&client, &clientSize);
 		ptclientSocket = &clientSocket;
 
-		//printf("\nNova conexao %s\n", client.sin_addr);
+		printf("\nNova conexao com endereco: %s\n", inet_ntoa(client.sin_addr));
 
-		hThread = CreateThread(NULL, 0, handleconnection, ptclientSocket, 0, &dwThreadId);
+		hThread = CreateThread(NULL, 0, KeyGenerator, ptclientSocket, 0, &dwThreadId);
 
 		if (hThread == NULL)
 		{
@@ -88,12 +84,12 @@ int main()
 
 	closesocket(clientSocket);
 	closesocket(listening);
+	CloseHandle(fileMutex);
 	WSACleanup();
 }
 
-DWORD WINAPI handleconnection(LPVOID lpParam)
+DWORD WINAPI KeyGenerator(LPVOID lpParam)
 {
-	// Main program loop
 	char strMsg[4096];
 	char strRec[4096];
 
@@ -101,6 +97,7 @@ DWORD WINAPI handleconnection(LPVOID lpParam)
 	SOCKET* ptCs;
 	ptCs = (SOCKET*)lpParam;
 	cs = *ptCs;
+	DWORD dwWaitResult;
 
 	// variáveis para geração de chaves
 	int key[KEY_SIZE_FULL];
@@ -110,7 +107,6 @@ DWORD WINAPI handleconnection(LPVOID lpParam)
 	int numKeysInt;
 	int countAllKeys = 0;
 	int isAlike = 0;
-	//char numKeysChar[100];
 	strcpy_s(message, 2000, "");
 	srand((unsigned)time(NULL));
 	int msgCount = 0;
@@ -123,11 +119,11 @@ DWORD WINAPI handleconnection(LPVOID lpParam)
 		ZeroMemory(strMsg, 4096);
 		int bytesReceived = recv(cs, strRec, 4096, 0);
 		if (bytesReceived == SOCKET_ERROR) {
-			printf("\nReceive error!\n");
+			printf("\nErro na rececao!\n");
 			break;
 		}
 		if (bytesReceived == 0) {
-			printf("\nClient disconnected!\n");
+			printf("\nCliente desligado!\n");
 			break;
 		}
 
@@ -139,84 +135,85 @@ DWORD WINAPI handleconnection(LPVOID lpParam)
 			if (strcmp(strRec, "QUIT") == 0) {
 				strcpy(strMsg, "400 BYE");
 				send(cs, strMsg, strlen(strMsg) + 1, 0);
-				printf("Response: %s\n", strMsg);
+				printf("Response:\n%s\n", strMsg);
 				break;
 			}
 
 			partialMsg = strtok(strRec, " ");
+			// Verifica se recebeu o comando GETKEY
 			if (strcmp(partialMsg, "GETKEY") == 0)
 			{
+				// guarda o primeiro parametro do comando GETKEY
 				partialMsg = strtok(NULL, " ");
 				if (partialMsg != NULL) {
 					numKeys = atoi(partialMsg);
+					// Se o parametro for um numero, gera esse numero de chaves
 					if (numKeys) {
 						strcpy(strMsg, "200 SENT");
 						send(cs, strMsg, strlen(strMsg) + 1, 0);
 						ZeroMemory(strMsg, 4096);
-						for (int k = 0; k < numKeys; k++)
+
+						// Esperar que o mutex seja libertado
+						dwWaitResult = WaitForSingleObject(fileMutex, INFINITE);
+						switch (dwWaitResult)
 						{
-							GenerateKey(key);
-							/*for (int i = 0; i < countAllKeys; i++)
-							{
-								isAlike = 0;
-								for (int j = 0; j < KEY_SIZE_FULL; j++)
+						case WAIT_OBJECT_0:		// Quando esta thread tiver o mutex gera as chaves
+							__try {
+
+								// Gerar numKeys(numero de chaves pedidas) chaves
+								for (int k = 0; k < numKeys; k++)
 								{
-										if (allKeys[i][j] == key[j]) 
-										{
-											isAlike++;
-										}
-										else
-										{
-											break;
-										}
+									GenerateKey(key);
+									keyString = StringFromKey(key);
+
+									// verifica se a chave gerada já existe
+									// se existir, decrementa k, gerando mais uma chave
+									if (KeyExistsInfile(keyString))
+									{
+										printf("Encontrada chave repetida.\n");
+										k--;
+										break;
+									}
+
+									SaveStringToFile(keyString);
+									strcat_s(strMsg, 4096, keyString);
 								}
-								if (isAlike == KEY_SIZE_FULL)
-								{
-									printf("Found repeated key:\n");
-									k--;
-									break;
-								}
+								// conta numero de chaves geradas, e adiciona à mensagem a enviar
+								countAllKeys = CountKeysInFile();
+								strcat_s(strMsg, 4096, "Generated ");
+								sprintf_s(&strMsg[strlen(strMsg)], sizeof(int), "%d", countAllKeys);
+								strcat_s(strMsg, 4096, " keys so far\n");
+								time_t now = time(0);
+								char* dt = ctime(&now);
+								strcat_s(strMsg, 4096, "Sent at: ");
+								strcat_s(strMsg, 4096, dt);
+
 							}
 
-							if (isAlike != KEY_SIZE_FULL) {
-								for (int w = 0; w < KEY_SIZE_FULL; w++)
+							__finally {
+								if (!ReleaseMutex(fileMutex))
 								{
-									allKeys[countAllKeys][w] = key[w];
-								}*/
-							keyString = StringFromKey(key); 
-
-							if (KeyInFile(keyString))
-							{
-								printf("Encontrada chave repetida.\n");
-								k--;
-								break;
+									printf("\nErro a libertar Mutex\n");
+								}
 							}
-
-							SaveStringToFile(keyString);
-							strcat_s(strMsg, 4096, keyString);
-							strcat_s(strMsg, 4096, "\r\n");
-							countAllKeys++;
-							//}
+							break;
+						case WAIT_ABANDONED:
+							printf("\nGeracao de chaves falhour por espera do Mutex.\n");
+							break;
 						}
-						strcat_s(strMsg, 4096, "Generated ");
-						sprintf_s(&strMsg[strlen(strMsg)], sizeof(int), "%d", countAllKeys);
-						strcat_s(strMsg, 4096, " keys so far\n");
-						time_t now = time(0);
-						char* dt = ctime(&now);
-						strcat_s(strMsg, 4096, "Sent at: ");
-						strcat_s(strMsg, 4096, dt);
+						
 					}
-					else
+					else	// Caso o paramentro do comando GETKEY nao seja um esperado
 					{
 						strcpy(strMsg, "302 UNEXPECTED");
 					}
 				}
-				else
+				else	// Caso o paramentro do comando GETKEY nao esteja presente
 				{
 					strcpy(strMsg, "301 MISSING");
 				}
 			}
-			else
+			else	// Caso nao seja reconhecido o comando
 			{
 				strcpy(strMsg, "300 UNRECOGNISED");
 			}
@@ -283,7 +280,6 @@ int cmp_fnc(const void* a, const void* b) {
 /// <param name="key">Array que contém a chave ordenada</param>
 /// <returns>string com a chave</returns>
 const char* StringFromKey(int* key) {
-	//char* str = (char*)malloc(2000 * sizeof(char));
 	char* str = malloc(2000);
 	if (str == NULL)
 	{
@@ -307,6 +303,7 @@ const char* StringFromKey(int* key) {
 			strcat_s(str, sizeof(char) * (strlen(str) + 7), " +   ");
 		}
 	}
+	strcat_s(str, 2000, "\n");
 	return str;
 }
 
@@ -317,9 +314,10 @@ const char* StringFromKey(int* key) {
 void SaveStringToFile(char message[])
 {
 	FILE* fp;
-	errno_t erro;
-	erro = fopen_s(&fp, "chaves.txt", "a");
-	if ((fp != 0) || (erro != 0))
+	//errno_t erro;
+	//erro = fopen_s(&fp, "chaves.txt", "a");
+	fp = fopen("chaves.txt", "a");
+	if (fp == NULL)
 	{
 		fprintf(stderr, "Erro a abrir ficheiro.\n");
 		return;
@@ -332,63 +330,52 @@ void SaveStringToFile(char message[])
 	fclose(fp);
 }
 
-char* readLine(FILE* infile)
-{
-	int n = 0, size = 128, ch;
-	char* line;
-	line = malloc(size + 1);
-	while ((ch = getc(infile)) != '\n' && ch != EOF) {
-		if (n == size) {
-			size = 2;
-			line = realloc(line, size + 1);
-		}
-		line[n++] = ch;
-	}
-	if (n == 0 && ch == EOF) {
-		free(line);
-		return NULL;
-	}
-	line[n] = '\0';
-	line = realloc(line, n + 1);
-	return line;
-}
-
-int KeyExistsInFile(char message[]) {
-	char key = NULL;
-	int exists = 0;
-
-	FILE* fp = fopen("keys.txt", "r");
-	while (key != EOF)
-	{
-		key = readLine(fp);
-		if (strcmp(key, message) == 0) {
-			exists = 1;
-		}
-	}
-	fclose(fp);
-
-	return exists;
-}
-
-int KeyInFile(char message[]) {
+/// <summary>
+/// Verifica se uma chave já se encontra no ficheiro das chaves
+/// </summary>
+/// <param name="message">- string com a chave a verificar</param>
+/// <returns> Retorna 1 se chave for repetida, 0 senão se encontrar no ficheiro</returns>
+int KeyExistsInfile(char message[]) {
 	FILE* fp;
-	char* line = NULL;
-	size_t len = 0;
-	int exists = 0;
-
-	fp = fopen("key.txt", "r");
+	char keyRead[50];
+	int keyExists = 0;
+	
+	fp = fopen("chaves.txt", "r");
 	if (fp == NULL)
 	{
-		printf("\nErro a abrir ficheiro.\n");
+		printf("Erro a ler ficheiro");
+		return 0;
 	}
 
-	while ((fgets(&line, sizeof(message), fp)) != -1)
+	while (fgets(keyRead, 50, fp) != NULL)
 	{
-		if (strcmp(line ,message) == 0)
-		{
-			exists = 1;
+		if (strcmp(keyRead, message) == 0) {
+			keyExists = 1;
+			return keyExists;
 		}
 	}
-	fclose(fp);
-	return exists;
+	return keyExists;
+}
+
+/// <summary>
+/// Conta o numero de chaves no ficheiro das chaves
+/// </summary>
+/// <returns> int com numero de chaves</returns>
+int CountKeysInFile() {
+	FILE* fp;
+	char keyRead[50];
+	int keyCount = 0;
+
+	fp = fopen("chaves.txt", "r");
+	if (fp == NULL)
+	{
+		printf("Erro a ler ficheiro");
+		return 0;
+	}
+
+	while (fgets(keyRead, 50, fp) != NULL)
+	{
+		keyCount++;
+	}
+	return keyCount;
 }
