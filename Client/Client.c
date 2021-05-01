@@ -1,6 +1,5 @@
-/*
-	Simple winsock client
-*/
+
+/*  Trabalho realizado por João Costa al59259, Luís Ribeiro al68708 e Pedro Monteiro al69605  */
 
 #include<stdio.h>
 #include<winsock2.h>

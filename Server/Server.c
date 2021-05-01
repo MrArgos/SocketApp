@@ -1,3 +1,6 @@
+
+/*  Trabalho realizado por João Costa al59259, Luís Ribeiro al68708 e Pedro Monteiro al69605  */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <winsock2.h>
@@ -23,6 +26,7 @@ HANDLE fileMutex;
 
 int main()
 {
+	// Inicializar Winsock
 	WSADATA wsData;
 	WORD ver = MAKEWORD(2, 2);
 	int wsResult = WSAStartup(ver, &wsData);
@@ -38,7 +42,8 @@ int main()
 		printf("Erro na criacao do Mutex: %d\n", GetLastError());
 		return 1;
 	}
-	// Criar o socket
+
+	// Criar socket
 	SOCKET listening = socket(AF_INET, SOCK_STREAM, 0);
 	if (listening == INVALID_SOCKET) {
 		fprintf(stderr, "\nSocket creationg fail! Error Code : %d\n", WSAGetLastError());
@@ -66,14 +71,17 @@ int main()
 	HANDLE hThread;
 	int conresult = 0;
 
+	// Criação das threads para atendimento de multiplos clientes
 	while (TRUE)
-	{
+	{	
+		// criação dos sockets para cada cliente
 		clientSize = sizeof(client);
 		clientSocket = accept(listening, (struct sockaddr*)&client, &clientSize);
 		ptclientSocket = &clientSocket;
 
 		printf("\nNova conexao com endereco: %s\n", inet_ntoa(client.sin_addr));
 
+		// criação da thread respetiva a cada cliente
 		hThread = CreateThread(NULL, 0, KeyGenerator, ptclientSocket, 0, &dwThreadId);
 
 		if (hThread == NULL)
@@ -167,22 +175,23 @@ DWORD WINAPI KeyGenerator(LPVOID lpParam)
 									GenerateKey(key);
 									keyString = StringFromKey(key);
 
-									// verifica se a chave gerada já existe
+									// Verifica se a chave gerada já existe.
 									// se existir, decrementa k, gerando mais uma chave
 									if (KeyExistsInfile(keyString))
 									{
 										printf("\nEncontrada chave repetida.\n");
-										k--;
+										k--;		// Gerar mais uma chave
 										break;
 									}
 
+									// Guardar a chave no ficheiro "chaves.txt"
 									SaveStringToFile(keyString);
 									strcat_s(strMsg, 4096, keyString);
 								}
 								// conta numero de chaves geradas, e adiciona à mensagem a enviar
 								countAllKeys = CountKeysInFile();
 								strcat_s(strMsg, 4096, "This server has generated ");
-								sprintf_s(&strMsg[strlen(strMsg)], sizeof(int), "%d", countAllKeys);
+								sprintf_s(&strMsg[strlen(strMsg)], sizeof(int) * 64, "%d", countAllKeys);
 								strcat_s(strMsg, 4096, " keys so far.\n");
 								time_t now = time(0);
 								char* dt = ctime(&now);
@@ -276,10 +285,10 @@ int cmp_fnc(const void* a, const void* b) {
 }
 
 /// <summary>
-/// Retorna uma string com a chave passada à função.
+/// Transforma array de int em string contendo a chave
 /// </summary>
 /// <param name="key">- Array que contém a chave ordenada</param>
-/// <returns>string com a chave</returns>
+/// <returns>char* str - string com a chave</returns>
 const char* StringFromKey(int* key) {
 	char* str = malloc(2000);
 	if (str == NULL)
