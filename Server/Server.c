@@ -156,7 +156,9 @@ DWORD WINAPI KeyGenerator(LPVOID lpParam)
 						dwWaitResult = WaitForSingleObject(fileMutex, INFINITE);
 						switch (dwWaitResult)
 						{
-						case WAIT_OBJECT_0:		// Quando esta thread tiver o mutex gera as chaves
+						case WAIT_OBJECT_0:		
+
+							// Quando esta thread tiver o mutex, começa a gerar as chaves
 							__try {
 
 								// Gerar numKeys(numero de chaves pedidas) chaves
