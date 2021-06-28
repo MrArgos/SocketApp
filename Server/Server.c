@@ -231,6 +231,7 @@ DWORD WINAPI KeyGenerator(LPVOID lpParam)
 			printf("Response:\n%s\n", strMsg);
 		}
 	}
+	return 0;
 }
 
 /// <summary>
